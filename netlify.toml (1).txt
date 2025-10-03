@@ -1,0 +1,16 @@
+[build]
+  command = "npm ci && npm run build"
+  publish = ".next"
+  base = "."
+
+[build.environment]
+  NODE_ENV = "production"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[dev]
+  command = "npm run dev"

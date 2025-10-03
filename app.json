@@ -1,0 +1,38 @@
+{
+  "name": "Carrom Arena Real Money Gaming Platform",
+  "description": "A comprehensive real money gaming platform with OTP authentication, wallet system, and 1v1 Carrom matches",
+  "repository": "https://github.com/yourusername/carrom-arena",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["node", "express", "heroku", "gaming", "nextjs", "carrom"],
+  "image": "heroku/nodejs",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1
+    }
+  },
+  "addons": [
+    "heroku-postgresql:hobby-dev"
+  ],
+  "scripts": {
+    "postdeploy": "echo 'App deployed successfully'"
+  },
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment for the application",
+      "value": "production"
+    },
+    "NEXT_TELEMETRY_DISABLED": {
+      "description": "Disable Next.js telemetry",
+      "value": "1"
+    }
+  },
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  }
+}
