@@ -1,0 +1,4 @@
+package-manager=npm
+engine-strict=false
+audit=false
+fund=false
