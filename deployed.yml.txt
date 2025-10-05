@@ -1,0 +1,363 @@
+# ============================================
+# CARROM ARENA - DEPLOYMENT WORKFLOW
+# ============================================
+# GitHub Actions workflow for automated deployment
+# Supports multiple environments and deployment targets
+
+name: 🚀 Deploy Carrom Arena
+
+# ============================================
+# TRIGGER CONDITIONS
+# ============================================
+on:
+  # Deploy on push to main branch
+  push:
+    branches: [main, production]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - '.gitignore'
+  
+  # Deploy on release creation
+  release:
+    types: [created]
+  
+  # Manual deployment trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+      deploy_to:
+        description: 'Deployment Target'
+        required: true
+        default: 'vercel'
+        type: choice
+        options:
+          - vercel
+          - netlify
+          - render
+          - docker
+
+# ============================================
+# ENVIRONMENT VARIABLES
+# ============================================
+env:
+  NODE_VERSION: '18'
+  PNPM_VERSION: '8'
+  DEPLOYMENT_TIMEOUT: '10m'
+
+# ============================================
+# JOBS CONFIGURATION
+# ============================================
+jobs:
+  # ==========================================
+  # PRE-DEPLOYMENT CHECKS
+  # ==========================================
+  pre-deployment:
+    name: 🔍 Pre-Deployment Checks
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      environment: ${{ steps.env.outputs.environment }}
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 🏷️ Extract Version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+
+      - name: 🌍 Determine Environment
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          else
+            echo "environment=development" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📋 Environment Summary
+        run: |
+          echo "🎯 **Deployment Summary**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================
+  # BUILD AND TEST
+  # ==========================================
+  build-and-test:
+    name: 🔨 Build & Test
+    runs-on: ubuntu-latest
+    needs: pre-deployment
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          echo "✅ Dependencies installed successfully"
+
+      - name: 🔍 Lint Code
+        run: |
+          npm run lint
+          echo "✅ Code linting passed"
+
+      - name: 🔧 Type Check
+        run: |
+          npm run type-check
+          echo "✅ TypeScript type checking passed"
+
+      - name: 🏗️ Build Application
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+          GENERATE_SOURCEMAP: false
+        run: |
+          npm run build
+          echo "✅ Application built successfully"
+
+      - name: 📊 Build Size Analysis
+        run: |
+          echo "📈 **Build Analysis**" >> $GITHUB_STEP_SUMMARY
+          if [ -f ".next/analyze.json" ]; then
+            node -e "
+              const data = require('./.next/analyze.json');
+              console.log(\`- **Bundle Size:** \${(data.bundleSize / 1024 / 1024).toFixed(2)} MB\`);
+              console.log(\`- **Page Count:** \${data.pageCount}\`);
+            " >> $GITHUB_STEP_SUMMARY
+          fi
+          du -sh .next/ | cut -f1 | xargs -I {} echo "- **Total Build Size:** {}" >> $GITHUB_STEP_SUMMARY
+
+      - name: 💾 Cache Build Output
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next
+            node_modules
+          key: ${{ runner.os }}-build-${{ github.sha }}
+
+  # ==========================================
+  # SECURITY SCAN
+  # ==========================================
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: pre-deployment
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Dependency Security Audit
+        run: |
+          npm audit --audit-level=high --production
+          echo "✅ Security audit completed"
+
+      - name: 🔐 Check for Secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+
+  # ==========================================
+  # VERCEL DEPLOYMENT
+  # ==========================================
+  deploy-vercel:
+    name: 🚀 Deploy to Vercel
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, build-and-test, security-scan]
+    if: ${{ github.event.inputs.deploy_to == 'vercel' || github.event.inputs.deploy_to == '' }}
+    environment: ${{ needs.pre-deployment.outputs.environment }}
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🚀 Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./
+
+      - name: 📝 Deployment Success
+        run: |
+          echo "🎉 **Deployment Successful!**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform:** Vercel" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** https://carrom-arena.vercel.app" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.pre-deployment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================
+  # RENDER DEPLOYMENT
+  # ==========================================
+  deploy-render:
+    name: 🚀 Deploy to Render
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, build-and-test, security-scan]
+    if: ${{ github.event.inputs.deploy_to == 'render' }}
+    environment: ${{ needs.pre-deployment.outputs.environment }}
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🚀 Trigger Render Deploy
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}",
+              "environment": "${{ needs.pre-deployment.outputs.environment }}"
+            }'
+
+      - name: ⏳ Wait for Deployment
+        run: |
+          echo "⏳ Waiting for Render deployment to complete..."
+          sleep 180  # Wait 3 minutes for deployment
+
+      - name: ✅ Verify Deployment
+        run: |
+          curl -f -s -o /dev/null https://carrom-arena.onrender.com/api/health || exit 1
+          echo "✅ Deployment verification successful"
+
+  # ==========================================
+  # DOCKER DEPLOYMENT
+  # ==========================================
+  deploy-docker:
+    name: 🐳 Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, build-and-test, security-scan]
+    if: ${{ github.event.inputs.deploy_to == 'docker' }}
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐳 Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ needs.pre-deployment.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================
+  # POST-DEPLOYMENT VERIFICATION
+  # ==========================================
+  post-deployment:
+    name: ✅ Post-Deployment Verification
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, deploy-vercel]
+    if: ${{ always() && needs.deploy-vercel.result == 'success' }}
+    
+    steps:
+      - name: 🏥 Health Check
+        run: |
+          sleep 30  # Wait for deployment to be ready
+          curl -f -s https://carrom-arena.vercel.app/api/health
+          echo "✅ Health check passed"
+
+      - name: 🔍 Core Functionality Test
+        run: |
+          # Test main page
+          curl -f -s -o /dev/null https://carrom-arena.vercel.app/
+          
+          # Test API endpoints
+          curl -f -s -o /dev/null https://carrom-arena.vercel.app/api/health
+          
+          echo "✅ Core functionality tests passed"
+
+      - name: 📊 Performance Check
+        run: |
+          RESPONSE_TIME=$(curl -w "%{time_total}" -s -o /dev/null https://carrom-arena.vercel.app/)
+          echo "🚀 Response time: ${RESPONSE_TIME}s"
+          
+          if (( $(echo "$RESPONSE_TIME > 2.0" | bc -l) )); then
+            echo "⚠️ Warning: Response time is slower than expected"
+          fi
+
+      - name: 📧 Notification
+        if: ${{ success() }}
+        run: |
+          echo "🎉 **Deployment Complete!**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.pre-deployment.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ needs.pre-deployment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** https://carrom-arena.vercel.app" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================
+  # FAILURE NOTIFICATION
+  # ==========================================
+  notify-failure:
+    name: 📢 Deployment Failed
+    runs-on: ubuntu-latest
+    needs: [deploy-vercel, deploy-render, deploy-docker]
+    if: ${{ failure() }}
+    
+    steps:
+      - name: 📧 Failure Notification
+        run: |
+          echo "❌ **Deployment Failed**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
+
+# ============================================
+# WORKFLOW CONFIGURATION NOTES
+# ============================================
+# Required Secrets:
+# - VERCEL_TOKEN: Vercel deployment token
+# - VERCEL_ORG_ID: Vercel organization ID
+# - VERCEL_PROJECT_ID: Vercel project ID
+# - RENDER_DEPLOY_HOOK: Render deployment webhook URL
+# - GITHUB_TOKEN: Automatically provided by GitHub
+#
+# Optional Secrets:
+# - SLACK_WEBHOOK: For Slack notifications
+# - DISCORD_WEBHOOK: For Discord notifications
+# - EMAIL_SMTP_*: For email notifications
