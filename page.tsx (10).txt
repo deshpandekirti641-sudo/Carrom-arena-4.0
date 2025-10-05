@@ -1,0 +1,432 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { ArenaMap } from '@/components/arena/ArenaMap'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import type { PlayerLocation, ArenaEvent, LiveData } from '@/types/arena'
+
+export default function ArenaPage(): JSX.Element {
+  const [currentLocation, setCurrentLocation] = useState<PlayerLocation | undefined>(undefined)
+  const [selectedZone, setSelectedZone] = useState<string>('')
+  const [liveData, setLiveData] = useState<LiveData[]>([])
+  const [upcomingEvents, setUpcomingEvents] = useState<ArenaEvent[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+
+  // Simulate getting user's location
+  useEffect(() => {
+    // In a real app, this would use GPS or indoor positioning
+    const simulateLocation = (): PlayerLocation => ({
+      x: 50, // Center of arena
+      y: 30, // Near main hall
+      facilityId: 'main-hall',
+      timestamp: new Date()
+    })
+
+    const timer = setTimeout(() => {
+      setCurrentLocation(simulateLocation())
+      setIsLoading(false)
+    }, 1500)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Simulate live data updates
+  useEffect(() => {
+    const updateLiveData = (): void => {
+      const mockLiveData: LiveData[] = [
+        {
+          facilityId: 'main-hall',
+          currentOccupancy: 180,
+          activeMatches: 25,
+          averageWaitTime: 3,
+          prizePoolActive: 1250000,
+          lastUpdated: new Date(),
+          systemStatus: 'online'
+        },
+        {
+          facilityId: 'vip-lounge',
+          currentOccupancy: 32,
+          activeMatches: 4,
+          averageWaitTime: 8,
+          prizePoolActive: 850000,
+          lastUpdated: new Date(),
+          systemStatus: 'online'
+        },
+        {
+          facilityId: 'training-center',
+          currentOccupancy: 65,
+          activeMatches: 0,
+          averageWaitTime: 15,
+          prizePoolActive: 0,
+          lastUpdated: new Date(),
+          systemStatus: 'online'
+        },
+        {
+          facilityId: 'tournament-arena',
+          currentOccupancy: 450,
+          activeMatches: 2,
+          averageWaitTime: 0,
+          prizePoolActive: 5000000,
+          lastUpdated: new Date(),
+          systemStatus: 'maintenance'
+        }
+      ]
+
+      setLiveData(mockLiveData)
+    }
+
+    const mockEvents: ArenaEvent[] = [
+      {
+        id: 'championship-2024',
+        name: 'Mumbai Carrom Championship',
+        type: 'tournament',
+        facilityId: 'tournament-arena',
+        startTime: new Date(Date.now() + 3600000), // 1 hour from now
+        endTime: new Date(Date.now() + 18000000), // 5 hours from now
+        maxParticipants: 128,
+        currentParticipants: 96,
+        prizePool: '₹10,00,000',
+        registrationRequired: true,
+        status: 'upcoming'
+      },
+      {
+        id: 'training-basics',
+        name: 'Beginner Training Session',
+        type: 'training',
+        facilityId: 'training-center',
+        startTime: new Date(Date.now() + 1800000), // 30 minutes from now
+        endTime: new Date(Date.now() + 5400000), // 1.5 hours from now
+        maxParticipants: 20,
+        currentParticipants: 15,
+        registrationRequired: true,
+        status: 'upcoming'
+      },
+      {
+        id: 'vip-night',
+        name: 'VIP High-Stakes Night',
+        type: 'special',
+        facilityId: 'vip-lounge',
+        startTime: new Date(Date.now() + 7200000), // 2 hours from now
+        endTime: new Date(Date.now() + 21600000), // 6 hours from now
+        maxParticipants: 48,
+        currentParticipants: 28,
+        prizePool: '₹25,00,000',
+        registrationRequired: true,
+        status: 'upcoming'
+      }
+    ]
+
+    updateLiveData()
+    setUpcomingEvents(mockEvents)
+
+    // Update live data every 30 seconds
+    const interval = setInterval(updateLiveData, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleZoneClick = (zoneId: string): void => {
+    setSelectedZone(zoneId)
+  }
+
+  const handleLocationUpdate = (location: PlayerLocation): void => {
+    setCurrentLocation(location)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+        <Card className="w-96">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
+            <h3 className="text-lg font-semibold mb-2">Loading Arena Map</h3>
+            <p className="text-gray-600 text-center">Fetching live facility data and player information...</p>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
+              <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '70%' }}></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">🏟️ Carrom Arena</h1>
+              <p className="text-gray-600">Interactive Building Map & Navigation</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <Badge variant="outline" className="bg-green-50 text-green-700">
+                🟢 Live
+              </Badge>
+              <Button variant="outline" size="sm">
+                📱 Get Mobile App
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <Tabs defaultValue="map" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="map">🗺️ Interactive Map</TabsTrigger>
+            <TabsTrigger value="events">📅 Events</TabsTrigger>
+            <TabsTrigger value="live-data">📊 Live Data</TabsTrigger>
+            <TabsTrigger value="info">ℹ️ Facility Info</TabsTrigger>
+          </TabsList>
+
+          {/* Interactive Map Tab */}
+          <TabsContent value="map" className="space-y-6">
+            <ArenaMap
+              currentPlayerLocation={currentLocation}
+              onZoneClick={handleZoneClick}
+              showNavigation={true}
+            />
+          </TabsContent>
+
+          {/* Events Tab */}
+          <TabsContent value="events" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  📅 Upcoming Events
+                  <Badge variant="secondary">{upcomingEvents.length} active</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {upcomingEvents.map((event) => (
+                    <div key={event.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{event.name}</h3>
+                          <p className="text-sm text-gray-600">
+                            {event.type.charAt(0).toUpperCase() + event.type.slice(1)} Event
+                          </p>
+                        </div>
+                        <Badge variant={event.status === 'upcoming' ? 'default' : 'secondary'}>
+                          {event.status}
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Start Time:</span>
+                          <p className="text-gray-600">
+                            {event.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium">Duration:</span>
+                          <p className="text-gray-600">
+                            {Math.round((event.endTime.getTime() - event.startTime.getTime()) / 3600000)}h
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium">Participants:</span>
+                          <p className="text-gray-600">
+                            {event.currentParticipants}/{event.maxParticipants}
+                          </p>
+                        </div>
+                        {event.prizePool && (
+                          <div>
+                            <span className="font-medium">Prize Pool:</span>
+                            <p className="text-green-600 font-semibold">{event.prizePool}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-2 mt-4">
+                        <Button size="sm">
+                          {event.registrationRequired ? 'Register Now' : 'View Details'}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleZoneClick(event.facilityId)}>
+                          📍 Show Location
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Live Data Tab */}
+          <TabsContent value="live-data" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {liveData.map((data) => (
+                <Card key={data.facilityId}>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">
+                        {data.facilityId === 'main-hall' && '🎮 Main Gaming Hall'}
+                        {data.facilityId === 'vip-lounge' && '👑 VIP Lounge'}
+                        {data.facilityId === 'training-center' && '🎯 Training Center'}
+                        {data.facilityId === 'tournament-arena' && '🏆 Tournament Arena'}
+                      </CardTitle>
+                      <Badge
+                        variant={data.systemStatus === 'online' ? 'default' : 'secondary'}
+                        className={data.systemStatus === 'online' ? 'bg-green-100 text-green-800' : ''}
+                      >
+                        {data.systemStatus}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{data.currentOccupancy}</div>
+                        <p className="text-sm text-gray-600">Current Players</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">{data.activeMatches}</div>
+                        <p className="text-sm text-gray-600">Active Matches</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-orange-600">{data.averageWaitTime}m</div>
+                        <p className="text-sm text-gray-600">Avg Wait Time</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">
+                          ₹{(data.prizePoolActive / 100000).toFixed(1)}L
+                        </div>
+                        <p className="text-sm text-gray-600">Active Prize Pool</p>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 text-xs text-gray-500">
+                      Last updated: {data.lastUpdated.toLocaleTimeString()}
+                    </div>
+                    
+                    <Button 
+                      className="w-full mt-4" 
+                      size="sm"
+                      onClick={() => handleZoneClick(data.facilityId)}
+                    >
+                      View on Map
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* Facility Info Tab */}
+          <TabsContent value="info" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>🏢 Facility Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Total Area:</span>
+                      <p className="text-gray-600">15,000 sq meters</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Gaming Tables:</span>
+                      <p className="text-gray-600">50 professional boards</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Max Capacity:</span>
+                      <p className="text-gray-600">1,003 players</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Operating Hours:</span>
+                      <p className="text-gray-600">24/7</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Daily Prize Pool:</span>
+                      <p className="text-green-600 font-semibold">₹2.5 Crores</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Average Daily Players:</span>
+                      <p className="text-blue-600 font-semibold">8,500+</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>📞 Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Main Number:</span>
+                      <p className="text-gray-600">+91-22-4567-8900</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Email:</span>
+                      <p className="text-gray-600">info@carromarena.in</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Address:</span>
+                      <p className="text-gray-600">BKC, Mumbai 400051</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Emergency Line:</span>
+                      <p className="text-red-600 font-semibold">+91-22-4567-8911</p>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t">
+                    <p className="text-xs text-gray-500 mb-2">Get directions:</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline">🗺️ Google Maps</Button>
+                      <Button size="sm" variant="outline">🚗 Uber</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle>🚨 Emergency Procedures</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="text-center p-4 bg-red-50 rounded-lg">
+                      <div className="text-2xl mb-2">🔥</div>
+                      <h4 className="font-semibold text-red-800">Fire Emergency</h4>
+                      <p className="text-sm text-red-600">Dial: 101</p>
+                      <p className="text-xs text-gray-600">Assembly: Front Plaza</p>
+                    </div>
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <div className="text-2xl mb-2">🏥</div>
+                      <h4 className="font-semibold text-blue-800">Medical Emergency</h4>
+                      <p className="text-sm text-blue-600">Dial: 102</p>
+                      <p className="text-xs text-gray-600">Station: Lobby Area</p>
+                    </div>
+                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                      <div className="text-2xl mb-2">🔒</div>
+                      <h4 className="font-semibold text-yellow-800">Security</h4>
+                      <p className="text-sm text-yellow-600">Dial: 100</p>
+                      <p className="text-xs text-gray-600">Response: 1 minute</p>
+                    </div>
+                    <div className="text-center p-4 bg-gray-50 rounded-lg">
+                      <div className="text-2xl mb-2">🚪</div>
+                      <h4 className="font-semibold text-gray-800">Evacuation</h4>
+                      <p className="text-sm text-gray-600">Follow: Exit Signs</p>
+                      <p className="text-xs text-gray-600">Time: 5 minutes</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}
