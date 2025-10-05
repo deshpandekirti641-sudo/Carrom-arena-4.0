@@ -1,0 +1,298 @@
+'use client'
+
+import { useState } from 'react'
+import type { ArenaFacility, PlayerLocation } from '@/types/arena'
+
+interface ArenaZoneProps {
+  facility: ArenaFacility
+  isSelected: boolean
+  onClick: () => void
+  currentPlayerLocation?: PlayerLocation
+}
+
+export function ArenaZone({ facility, isSelected, onClick, currentPlayerLocation }: ArenaZoneProps): JSX.Element {
+  const [isHovered, setIsHovered] = useState<boolean>(false)
+
+  const getZoneColor = (type: string, status: string): string => {
+    if (status === 'maintenance') return '#f59e0b'
+    if (status === 'closed') return '#ef4444'
+    
+    switch (type) {
+      case 'gaming':
+        return '#3b82f6'
+      case 'vip':
+        return '#8b5cf6'
+      case 'training':
+        return '#10b981'
+      case 'tournament':
+        return '#dc2626'
+      case 'service':
+        return '#06b6d4'
+      case 'amenity':
+        return '#f97316'
+      case 'admin':
+        return '#6b7280'
+      default:
+        return '#9ca3af'
+    }
+  }
+
+  const getZonePattern = (type: string): string => {
+    switch (type) {
+      case 'gaming':
+        return 'url(#gaming-pattern)'
+      case 'vip':
+        return 'url(#vip-pattern)'
+      case 'training':
+        return 'url(#training-pattern)'
+      case 'tournament':
+        return 'url(#tournament-pattern)'
+      default:
+        return getZoneColor(type, facility.status)
+    }
+  }
+
+  const isPlayerInZone = currentPlayerLocation && 
+    currentPlayerLocation.x >= facility.coordinates.x &&
+    currentPlayerLocation.x <= facility.coordinates.x + facility.coordinates.width &&
+    currentPlayerLocation.y >= facility.coordinates.y &&
+    currentPlayerLocation.y <= facility.coordinates.y + facility.coordinates.height
+
+  return (
+    <>
+      {/* SVG Patterns for different zone types */}
+      <defs>
+        <pattern id="gaming-pattern" patternUnits="userSpaceOnUse" width="4" height="4">
+          <rect width="4" height="4" fill="#3b82f6" />
+          <circle cx="2" cy="2" r="0.5" fill="#1d4ed8" />
+        </pattern>
+        <pattern id="vip-pattern" patternUnits="userSpaceOnUse" width="6" height="6">
+          <rect width="6" height="6" fill="#8b5cf6" />
+          <polygon points="3,1 4,3 6,3 4.5,4.5 5,6 3,5 1,6 1.5,4.5 0,3 2,3" fill="#7c3aed" />
+        </pattern>
+        <pattern id="training-pattern" patternUnits="userSpaceOnUse" width="5" height="5">
+          <rect width="5" height="5" fill="#10b981" />
+          <path d="M 1,1 L 4,1 L 4,4 L 1,4 Z" fill="none" stroke="#059669" strokeWidth="0.3" />
+        </pattern>
+        <pattern id="tournament-pattern" patternUnits="userSpaceOnUse" width="8" height="8">
+          <rect width="8" height="8" fill="#dc2626" />
+          <circle cx="4" cy="4" r="2" fill="none" stroke="#b91c1c" strokeWidth="0.5" />
+          <path d="M 2,4 L 6,4 M 4,2 L 4,6" stroke="#b91c1c" strokeWidth="0.3" />
+        </pattern>
+      </defs>
+
+      <g
+        onClick={onClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className="cursor-pointer"
+        transform={isHovered ? "scale(1.02)" : "scale(1)"}
+        style={{ transformOrigin: `${facility.coordinates.x + facility.coordinates.width/2}px ${facility.coordinates.y + facility.coordinates.height/2}px` }}
+      >
+        {/* Zone Background */}
+        <rect
+          x={facility.coordinates.x}
+          y={facility.coordinates.y}
+          width={facility.coordinates.width}
+          height={facility.coordinates.height}
+          fill={getZonePattern(facility.type)}
+          stroke={isSelected ? "#fbbf24" : "#374151"}
+          strokeWidth={isSelected ? "0.8" : "0.3"}
+          rx="1"
+          opacity={facility.status === 'closed' ? 0.5 : 0.8}
+        />
+
+        {/* Zone Border Highlight */}
+        {isSelected && (
+          <rect
+            x={facility.coordinates.x - 0.5}
+            y={facility.coordinates.y - 0.5}
+            width={facility.coordinates.width + 1}
+            height={facility.coordinates.height + 1}
+            fill="none"
+            stroke="#fbbf24"
+            strokeWidth="1"
+            rx="1.5"
+            className="animate-pulse"
+          />
+        )}
+
+        {/* Player Location Indicator */}
+        {isPlayerInZone && (
+          <circle
+            cx={facility.coordinates.x + facility.coordinates.width/2}
+            cy={facility.coordinates.y + facility.coordinates.height/2}
+            r="2"
+            fill="#ef4444"
+            stroke="#ffffff"
+            strokeWidth="0.5"
+            className="animate-ping"
+          />
+        )}
+
+        {/* Zone Label */}
+        <text
+          x={facility.coordinates.x + facility.coordinates.width/2}
+          y={facility.coordinates.y + facility.coordinates.height/2 - 2}
+          textAnchor="middle"
+          fontSize="2.5"
+          fill="white"
+          fontWeight="bold"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}
+        >
+          {facility.name}
+        </text>
+
+        {/* Tables/Capacity Info */}
+        <text
+          x={facility.coordinates.x + facility.coordinates.width/2}
+          y={facility.coordinates.y + facility.coordinates.height/2 + 1}
+          textAnchor="middle"
+          fontSize="1.5"
+          fill="white"
+          style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}
+        >
+          {facility.tables > 0 ? `${facility.tables} Tables` : `${facility.capacity} Cap`}
+        </text>
+
+        {/* Status Indicator */}
+        <circle
+          cx={facility.coordinates.x + facility.coordinates.width - 2}
+          cy={facility.coordinates.y + 2}
+          r="1.5"
+          fill={
+            facility.status === 'active' ? '#10b981' :
+            facility.status === 'maintenance' ? '#f59e0b' :
+            '#ef4444'
+          }
+          stroke="white"
+          strokeWidth="0.3"
+        />
+
+        {/* Capacity Gauge */}
+        {facility.status === 'active' && (
+          <g>
+            <rect
+              x={facility.coordinates.x + 1}
+              y={facility.coordinates.y + facility.coordinates.height - 2}
+              width={facility.coordinates.width - 2}
+              height="1"
+              fill="rgba(255,255,255,0.3)"
+              rx="0.5"
+            />
+            <rect
+              x={facility.coordinates.x + 1}
+              y={facility.coordinates.y + facility.coordinates.height - 2}
+              width={(facility.coordinates.width - 2) * 0.7} // 70% capacity simulation
+              height="1"
+              fill="#10b981"
+              rx="0.5"
+            />
+          </g>
+        )}
+
+        {/* Hover Effect Overlay */}
+        {isHovered && (
+          <rect
+            x={facility.coordinates.x}
+            y={facility.coordinates.y}
+            width={facility.coordinates.width}
+            height={facility.coordinates.height}
+            fill="rgba(255,255,255,0.2)"
+            stroke="rgba(255,255,255,0.5)"
+            strokeWidth="0.5"
+            rx="1"
+          />
+        )}
+
+        {/* Zone Type Icon */}
+        <g transform={`translate(${facility.coordinates.x + 2}, ${facility.coordinates.y + 2})`}>
+          {facility.type === 'gaming' && (
+            <g fill="white">
+              <rect x="0" y="0" width="3" height="2" rx="0.3" />
+              <circle cx="0.8" cy="0.8" r="0.2" />
+              <circle cx="2.2" cy="0.8" r="0.2" />
+            </g>
+          )}
+          {facility.type === 'vip' && (
+            <g fill="gold">
+              <polygon points="1.5,0 2,1 3,1 2.3,1.7 2.5,2.5 1.5,2 0.5,2.5 0.7,1.7 0,1 1,1" />
+            </g>
+          )}
+          {facility.type === 'training' && (
+            <g fill="white" stroke="white" strokeWidth="0.1">
+              <circle cx="1.5" cy="0.8" r="0.6" fill="none" />
+              <path d="M 1.2,0.8 L 1.8,0.8 M 1.5,0.5 L 1.5,1.1" />
+            </g>
+          )}
+          {facility.type === 'tournament' && (
+            <g fill="gold">
+              <rect x="0.7" y="0.3" width="1.6" height="1.4" rx="0.2" />
+              <rect x="1.2" y="1.7" width="0.6" height="0.6" />
+              <polygon points="1.5,0.6 1.3,1 1.7,1" />
+            </g>
+          )}
+        </g>
+
+        {/* Maintenance Overlay */}
+        {facility.status === 'maintenance' && (
+          <g>
+            <rect
+              x={facility.coordinates.x}
+              y={facility.coordinates.y}
+              width={facility.coordinates.width}
+              height={facility.coordinates.height}
+              fill="rgba(245,158,11,0.3)"
+              stroke="rgba(245,158,11,0.8)"
+              strokeWidth="0.5"
+              strokeDasharray="2,2"
+              rx="1"
+            />
+            <text
+              x={facility.coordinates.x + facility.coordinates.width/2}
+              y={facility.coordinates.y + facility.coordinates.height/2 + 3}
+              textAnchor="middle"
+              fontSize="1.5"
+              fill="#d97706"
+              fontWeight="bold"
+            >
+              MAINTENANCE
+            </text>
+          </g>
+        )}
+
+        {/* Closed Overlay */}
+        {facility.status === 'closed' && (
+          <g>
+            <line
+              x1={facility.coordinates.x}
+              y1={facility.coordinates.y}
+              x2={facility.coordinates.x + facility.coordinates.width}
+              y2={facility.coordinates.y + facility.coordinates.height}
+              stroke="#ef4444"
+              strokeWidth="1"
+            />
+            <line
+              x1={facility.coordinates.x + facility.coordinates.width}
+              y1={facility.coordinates.y}
+              x2={facility.coordinates.x}
+              y2={facility.coordinates.y + facility.coordinates.height}
+              stroke="#ef4444"
+              strokeWidth="1"
+            />
+            <text
+              x={facility.coordinates.x + facility.coordinates.width/2}
+              y={facility.coordinates.y + facility.coordinates.height/2 + 3}
+              textAnchor="middle"
+              fontSize="1.5"
+              fill="#ef4444"
+              fontWeight="bold"
+            >
+              CLOSED
+            </text>
+          </g>
+        )}
+      </g>
+    </>
+  )
+}

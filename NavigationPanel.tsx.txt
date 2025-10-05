@@ -1,0 +1,404 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+import type { ArenaFacility, NavigationRoute, WaypointDirection } from '@/types/arena'
+
+interface NavigationPanelProps {
+  facilities: ArenaFacility[]
+  selectedFacility?: ArenaFacility | null
+  onFacilitySelect: (facilityId: string) => void
+}
+
+const navigationRoutes: NavigationRoute[] = [
+  {
+    from: 'entrance',
+    to: 'main-hall',
+    distance: 45,
+    estimatedTime: 2,
+    difficulty: 'easy',
+    directions: [
+      { step: 1, instruction: 'Enter through main entrance', distance: 0, landmark: 'Main Entrance' },
+      { step: 2, instruction: 'Walk straight through lobby', distance: 20, landmark: 'Reception Desk' },
+      { step: 3, instruction: 'Turn right at information board', distance: 15, landmark: 'Info Board' },
+      { step: 4, instruction: 'Continue straight to gaming hall', distance: 10, landmark: 'Gaming Hall Entrance' }
+    ]
+  },
+  {
+    from: 'main-hall',
+    to: 'vip-lounge',
+    distance: 35,
+    estimatedTime: 2,
+    difficulty: 'easy',
+    directions: [
+      { step: 1, instruction: 'Exit main hall towards lobby', distance: 10, landmark: 'Gaming Hall Exit' },
+      { step: 2, instruction: 'Turn left at reception', distance: 15, landmark: 'Reception Desk' },
+      { step: 3, instruction: 'Present VIP access card', distance: 5, landmark: 'VIP Security' },
+      { step: 4, instruction: 'Enter VIP lounge', distance: 5, landmark: 'VIP Lounge' }
+    ]
+  },
+  {
+    from: 'main-hall',
+    to: 'tournament-arena',
+    distance: 55,
+    estimatedTime: 3,
+    difficulty: 'medium',
+    directions: [
+      { step: 1, instruction: 'Exit gaming hall from south door', distance: 5, landmark: 'South Exit' },
+      { step: 2, instruction: 'Walk through main corridor', distance: 30, landmark: 'Main Corridor' },
+      { step: 3, instruction: 'Follow tournament signs', distance: 15, landmark: 'Tournament Signage' },
+      { step: 4, instruction: 'Enter tournament arena', distance: 5, landmark: 'Arena Entrance' }
+    ]
+  }
+]
+
+export function NavigationPanel({ facilities, selectedFacility, onFacilitySelect }: NavigationPanelProps): JSX.Element {
+  const [searchTerm, setSearchTerm] = useState<string>('')
+  const [filterType, setFilterType] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [currentRoute, setCurrentRoute] = useState<NavigationRoute | null>(null)
+  const [isNavigating, setIsNavigating] = useState<boolean>(false)
+  const [currentStep, setCurrentStep] = useState<number>(0)
+
+  const filteredFacilities = facilities.filter((facility) => {
+    const matchesSearch = facility.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          facility.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesType = filterType === 'all' || facility.type === filterType
+    const matchesStatus = filterStatus === 'all' || facility.status === filterStatus
+    
+    return matchesSearch && matchesType && matchesStatus
+  })
+
+  const startNavigation = (destinationId: string): void => {
+    const route = navigationRoutes.find(r => r.to === destinationId)
+    if (route) {
+      setCurrentRoute(route)
+      setIsNavigating(true)
+      setCurrentStep(0)
+    }
+  }
+
+  const nextStep = (): void => {
+    if (currentRoute && currentStep < currentRoute.directions.length - 1) {
+      setCurrentStep(currentStep + 1)
+    } else {
+      setIsNavigating(false)
+      setCurrentRoute(null)
+      setCurrentStep(0)
+    }
+  }
+
+  const stopNavigation = (): void => {
+    setIsNavigating(false)
+    setCurrentRoute(null)
+    setCurrentStep(0)
+  }
+
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800'
+      case 'maintenance':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'closed':
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getTypeIcon = (type: string): string => {
+    switch (type) {
+      case 'gaming':
+        return '🎮'
+      case 'vip':
+        return '👑'
+      case 'training':
+        return '🎯'
+      case 'tournament':
+        return '🏆'
+      case 'service':
+        return '💳'
+      case 'amenity':
+        return '🍕'
+      case 'admin':
+        return '⚙️'
+      default:
+        return '📍'
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Navigation Active */}
+      {isNavigating && currentRoute && (
+        <Card className="border-blue-500 bg-blue-50">
+          <CardHeader className="pb-3">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg text-blue-900">🧭 Navigation Active</CardTitle>
+              <Button variant="outline" size="sm" onClick={stopNavigation}>
+                Stop
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-blue-700">
+                  Step {currentStep + 1} of {currentRoute.directions.length}
+                </span>
+                <Badge variant="secondary">
+                  {currentRoute.estimatedTime - Math.floor((currentStep / currentRoute.directions.length) * currentRoute.estimatedTime)} min left
+                </Badge>
+              </div>
+              
+              <div className="bg-white rounded-lg p-4 border">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold">
+                    {currentStep + 1}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {currentRoute.directions[currentStep].instruction}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      📍 {currentRoute.directions[currentStep].landmark}
+                    </p>
+                  </div>
+                </div>
+                
+                {currentRoute.directions[currentStep].distance > 0 && (
+                  <p className="text-sm text-blue-600 ml-11">
+                    🚶‍♂️ {currentRoute.directions[currentStep].distance}m ahead
+                  </p>
+                )}
+              </div>
+
+              <Button onClick={nextStep} className="w-full">
+                {currentStep < currentRoute.directions.length - 1 ? 'Next Step' : 'Arrived! 🎉'}
+              </Button>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${((currentStep + 1) / currentRoute.directions.length) * 100}%` }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Search and Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            📍 Arena Navigator
+            <Badge variant="outline" className="ml-auto">
+              {filteredFacilities.length} locations
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Input
+              placeholder="Search locations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+            
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="gaming">Gaming</SelectItem>
+                  <SelectItem value="vip">VIP</SelectItem>
+                  <SelectItem value="training">Training</SelectItem>
+                  <SelectItem value="tournament">Tournament</SelectItem>
+                  <SelectItem value="service">Service</SelectItem>
+                  <SelectItem value="amenity">Amenity</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Locations List */}
+      <Card>
+        <CardHeader>
+          <CardTitle>🏢 Arena Locations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {filteredFacilities.map((facility) => (
+              <div key={facility.id} className="space-y-2">
+                <div
+                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                    selectedFacility?.id === facility.id 
+                      ? 'border-blue-500 bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                  onClick={() => onFacilitySelect(facility.id)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{getTypeIcon(facility.type)}</span>
+                        <span className="font-semibold text-gray-900">{facility.name}</span>
+                        <Badge className={getStatusColor(facility.status)}>
+                          {facility.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">{facility.description}</p>
+                      
+                      <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                        <span>👥 {facility.capacity}</span>
+                        {facility.tables > 0 && <span>🎯 {facility.tables} tables</span>}
+                        <span>🕒 {facility.operatingHours}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {facility.status === 'active' && (
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          startNavigation(facility.id)
+                        }}
+                        className="text-xs"
+                      >
+                        🧭 Navigate
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Quick view functionality
+                        }}
+                        className="text-xs"
+                      >
+                        👁️ Quick View
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {selectedFacility?.id === facility.id && (
+                  <div className="ml-6 p-3 bg-gray-50 rounded-lg border-l-4 border-blue-500">
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="font-medium">Prize Pool:</span>
+                          <p className="text-green-600">{facility.prizePool}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium">Booking:</span>
+                          <p className={facility.bookingRequired ? 'text-orange-600' : 'text-green-600'}>
+                            {facility.bookingRequired ? 'Required' : 'Walk-in'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <span className="font-medium text-sm">Amenities:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {facility.amenities.slice(0, 3).map((amenity, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {amenity}
+                            </Badge>
+                          ))}
+                          {facility.amenities.length > 3 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{facility.amenities.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {filteredFacilities.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <p>No locations found matching your criteria</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setFilterType('all')
+                    setFilterStatus('all')
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>⚡ Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" size="sm" onClick={() => onFacilitySelect('main-hall')}>
+              🎮 Gaming Hall
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onFacilitySelect('vip-lounge')}>
+              👑 VIP Lounge
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onFacilitySelect('wallet-center')}>
+              💳 Wallet Center
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onFacilitySelect('food-court')}>
+              🍕 Food Court
+            </Button>
+          </div>
+          
+          <Separator className="my-3" />
+          
+          <div className="text-center">
+            <p className="text-sm text-gray-600 mb-2">Need help finding something?</p>
+            <Button size="sm" variant="outline" className="w-full">
+              🆘 Ask for Assistance
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
